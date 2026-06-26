@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# secrets / local config
+.env
+*.local
+
+# next.js
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# node-pty native build
+backend/node_modules/node-pty/build/
+
+# logs
+*.log
+npm-debug.log*
+.pm2/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
