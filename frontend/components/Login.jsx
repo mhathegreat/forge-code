@@ -5,17 +5,25 @@ import { Hammer, Loader2, KeyRound } from 'lucide-react';
 
 export default function Login({ onLogin }) {
   const [mode, setMode] = useState('loading'); // 'loading' | 'login' | 'setup'
+  const [providers, setProviders] = useState([]);
+  const [provider, setProvider] = useState('openrouter');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.setupStatus()
-      .then((s) => setMode(s.needsSetup ? 'setup' : 'login'))
+      .then((s) => {
+        setProviders(s.providers || []);
+        setMode(s.needsSetup ? 'setup' : 'login');
+      })
       .catch(() => setMode('login'));
   }, []);
+
+  const selProvider = providers.find((p) => p.id === provider);
 
   async function submit(e) {
     e.preventDefault();
@@ -24,9 +32,12 @@ export default function Login({ onLogin }) {
     if (mode === 'setup') {
       if (password.length < 4) { setError('Password must be at least 4 characters'); return; }
       if (password !== confirm) { setError('Passwords do not match'); return; }
+      if (selProvider && selProvider.custom && apiKey.trim() === '' && baseUrl.trim() === '') {
+        // custom with nothing configured is fine — they can finish in Settings
+      }
       setBusy(true);
       try {
-        await api.setup({ password, openrouterApiKey: apiKey.trim() });
+        await api.setup({ password, provider, apiKey: apiKey.trim(), baseUrl: baseUrl.trim() });
         onLogin();
       } catch (err) {
         setError(err.message || 'Setup failed');
@@ -49,7 +60,7 @@ export default function Login({ onLogin }) {
     <div className="h-screen w-screen flex items-center justify-center bg-ink-950">
       <form
         onSubmit={submit}
-        className="w-[380px] bg-ink-900 border border-ink-700 rounded-2xl p-7 shadow-2xl"
+        className="w-[400px] bg-ink-900 border border-ink-700 rounded-2xl p-7 shadow-2xl"
       >
         <div className="flex items-center gap-2 mb-1">
           <div className="w-9 h-9 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
@@ -100,18 +111,53 @@ export default function Login({ onLogin }) {
               placeholder="Same password again"
               className="w-full bg-ink-800 border border-ink-700 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-accent transition mb-3"
             />
-            <label className="block text-[11px] text-gray-500 mb-1 flex items-center gap-1">
-              <KeyRound size={11} /> OpenRouter API key <span className="text-gray-600">(optional — add later in Settings)</span>
-            </label>
-            <input
-              type="password" value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-or-v1-…"
-              className="w-full bg-ink-800 border border-ink-700 rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-accent transition"
-            />
-            <p className="text-[10px] text-gray-600 mt-1.5">
-              Get a free key at <span className="text-gray-400">openrouter.ai/keys</span> — free models work with a free account.
-            </p>
+
+            <label className="block text-[11px] text-gray-500 mb-1">AI provider</label>
+            <select
+              value={provider}
+              onChange={(e) => { setProvider(e.target.value); setApiKey(''); }}
+              className="w-full bg-ink-800 border border-ink-700 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-accent transition mb-3"
+            >
+              {(providers.length ? providers : [{ id: 'openrouter', name: 'OpenRouter', needsKey: true }]).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
+            {selProvider && selProvider.custom && (
+              <>
+                <label className="block text-[11px] text-gray-500 mb-1">Base URL (OpenAI-compatible)</label>
+                <input
+                  value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder="http://localhost:8000/v1"
+                  className="w-full bg-ink-800 border border-ink-700 rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-accent transition mb-3"
+                />
+              </>
+            )}
+
+            {(!selProvider || selProvider.needsKey || selProvider.custom) && (
+              <>
+                <label className="block text-[11px] text-gray-500 mb-1 flex items-center gap-1">
+                  <KeyRound size={11} /> API key
+                  <span className="text-gray-600">
+                    {selProvider && !selProvider.needsKey ? '(optional)' : '(optional — add later in Settings)'}
+                  </span>
+                </label>
+                <input
+                  type="password" value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Paste your API key"
+                  className="w-full bg-ink-800 border border-ink-700 rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-accent transition"
+                />
+                {selProvider && selProvider.keyHint && (
+                  <p className="text-[10px] text-gray-600 mt-1.5">
+                    Get a key at <span className="text-gray-400">{selProvider.keyHint}</span>
+                  </p>
+                )}
+              </>
+            )}
+            {selProvider && !selProvider.needsKey && !selProvider.custom && (
+              <p className="text-[10px] text-gray-600 mt-1">Local provider — no API key needed.</p>
+            )}
           </>
         )}
 

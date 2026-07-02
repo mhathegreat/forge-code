@@ -33,7 +33,8 @@ export const api = {
   setup: (body) => req('/api/setup', { method: 'POST', body: JSON.stringify(body) }),
   login: (password) => req('/api/login', { method: 'POST', body: JSON.stringify({ password }) }),
   logout: () => req('/api/logout', { method: 'POST' }),
-  testKey: (key) => req('/api/settings/test-key', { method: 'POST', body: JSON.stringify({ key }) }),
+  testKey: (body) => req('/api/settings/test-key', { method: 'POST', body: JSON.stringify(body || {}) }),
+  saveProvider: (id, body) => req('/api/providers/' + enc(id), { method: 'PUT', body: JSON.stringify(body || {}) }),
 
   settings: () => req('/api/settings'),
   saveSettings: (body) => req('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),

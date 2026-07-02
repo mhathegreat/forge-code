@@ -48,23 +48,34 @@ function setSessionCookie(res) {
 }
 
 // First-run: does the app still need a password/key? (no auth — it's the
-// signal the login page uses to decide which form to show)
+// signal the login page uses to decide which form to show; includes the
+// provider catalog so the setup screen can offer a provider choice)
 app.get('/api/setup-status', (req, res) => {
-  res.json({ needsSetup: auth.needsSetup(), hasKey: !!settings.getApiKey() });
+  const p = settings.getProvider();
+  res.json({
+    needsSetup: auth.needsSetup(),
+    hasKey: !!p.apiKey || !p.needsKey,
+    providers: settings.getPublic().providers.map(({ id, name, needsKey, custom, keyHint }) => ({ id, name, needsKey, custom, keyHint })),
+  });
 });
 
-// First-run setup: create the password (and optionally save the API key)
-// right from the browser. Only works while no password is configured.
+// First-run setup: create the password and optionally pick a provider +
+// save its API key, all from the browser. Only works while unconfigured.
 app.post('/api/setup', (req, res) => {
   if (!auth.needsSetup()) return res.status(403).json({ error: 'already configured' });
-  const { password, openrouterApiKey } = req.body || {};
+  const { password, provider, apiKey, baseUrl, name, openrouterApiKey } = req.body || {};
   if (!password || String(password).length < 4) {
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
   auth.setPassword(String(password));
-  if (openrouterApiKey && String(openrouterApiKey).trim()) {
-    settings.setSecret({ openrouterApiKey: String(openrouterApiKey).trim() });
-  }
+  try {
+    const pid = provider || 'openrouter';
+    if (provider) settings.set({ activeProvider: pid });
+    const key = (apiKey || openrouterApiKey || '').trim(); // legacy field accepted
+    if (key || baseUrl || name) {
+      settings.setProviderConfig(pid, { apiKey: key || undefined, baseUrl, name });
+    }
+  } catch (e) { /* provider config is optional at setup */ }
   setSessionCookie(res);
   res.json({ ok: true });
 });
@@ -94,12 +105,8 @@ app.put('/api/settings', requireAuth, (req, res) => {
     const body = req.body || {};
     let passwordChanged = false;
 
-    settings.set(body); // preference fields (whitelisted inside)
+    settings.set(body); // preference fields incl. activeProvider (whitelisted inside)
 
-    if (body.openrouterApiKey !== undefined) {
-      const key = String(body.openrouterApiKey || '').trim();
-      settings.setSecret({ openrouterApiKey: key }); // '' clears → falls back to .env
-    }
     if (body.newPassword !== undefined && body.newPassword !== '') {
       if (String(body.newPassword).length < 4) {
         return res.status(400).json({ error: 'Password must be at least 4 characters' });
@@ -111,23 +118,44 @@ app.put('/api/settings', requireAuth, (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// Validate an OpenRouter key (the typed one, or the currently effective one).
-app.post('/api/settings/test-key', requireAuth, async (req, res) => {
-  const key = (req.body && req.body.key && String(req.body.key).trim()) || settings.getApiKey();
-  if (!key) return res.json({ valid: false, error: 'No key to test' });
+// Save a provider's config (API key; base URL + name for the custom slot).
+app.put('/api/providers/:id', requireAuth, (req, res) => {
   try {
-    const r = await fetch('https://openrouter.ai/api/v1/key', {
-      headers: { Authorization: 'Bearer ' + key },
-    });
-    if (!r.ok) return res.json({ valid: false, error: 'OpenRouter rejected the key (HTTP ' + r.status + ')' });
-    const json = await r.json();
-    const d = json.data || {};
-    res.json({
-      valid: true,
-      label: d.label || null,
-      usage: typeof d.usage === 'number' ? d.usage : null,
-      freeTier: !!d.is_free_tier,
-    });
+    const { apiKey, baseUrl, name } = req.body || {};
+    settings.setProviderConfig(req.params.id, { apiKey, baseUrl, name });
+    res.json(settings.getPublic());
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Validate a key against a provider (the typed key, or the stored one).
+app.post('/api/settings/test-key', requireAuth, async (req, res) => {
+  const body = req.body || {};
+  const p = settings.getProvider(body.providerId || undefined);
+  const key = (body.key && String(body.key).trim()) || p.apiKey;
+  if (p.needsKey && !key) return res.json({ valid: false, error: 'No key to test' });
+  try {
+    if (p.id === 'openrouter') {
+      const r = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: 'Bearer ' + key } });
+      if (!r.ok) return res.json({ valid: false, error: 'OpenRouter rejected the key (HTTP ' + r.status + ')' });
+      const d = (await r.json()).data || {};
+      return res.json({
+        valid: true,
+        label: d.label || null,
+        usage: typeof d.usage === 'number' ? d.usage : null,
+        freeTier: !!d.is_free_tier,
+      });
+    }
+    // Generic check: can we list models with this key?
+    let url = p.baseUrl + '/models';
+    let headers = key ? { Authorization: 'Bearer ' + key } : {};
+    if (p.id === 'anthropic') {
+      url = 'https://api.anthropic.com/v1/models?limit=1';
+      headers = { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+    }
+    if (!p.baseUrl && p.id !== 'anthropic') return res.json({ valid: false, error: 'Base URL not set' });
+    const r = await fetch(url, { headers });
+    if (!r.ok) return res.json({ valid: false, error: `${p.name} rejected the request (HTTP ${r.status})` });
+    res.json({ valid: true, label: p.name, usage: null, freeTier: false });
   } catch (e) {
     res.json({ valid: false, error: e.message });
   }

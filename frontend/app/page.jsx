@@ -33,7 +33,8 @@ export default function Home() {
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [modelsList, setModelsList] = useState(null);
+  const [modelsData, setModelsData] = useState(null);
+  const [modelsError, setModelsError] = useState('');
   const [modelsLoading, setModelsLoading] = useState(false);
 
   const wsRef = useRef(null);
@@ -191,11 +192,16 @@ export default function Home() {
   // ---------- model + mode ----------
   async function openModelPicker() {
     setShowModelPicker(true);
-    if (!modelsList && !modelsLoading) {
-      setModelsLoading(true);
-      try { setModelsList(await api.models()); } catch { setModelsList([]); }
-      setModelsLoading(false);
+    // Always refetch — the active provider may have changed in Settings.
+    setModelsLoading(true);
+    setModelsError('');
+    try {
+      setModelsData(await api.models());
+    } catch (e) {
+      setModelsData(null);
+      setModelsError(e.message || 'Could not load models');
     }
+    setModelsLoading(false);
   }
   async function chooseModel(id) {
     setShowModelPicker(false);
@@ -395,8 +401,9 @@ export default function Home() {
 
       {showModelPicker && (
         <ModelPicker
-          models={modelsList}
+          data={modelsData}
           loading={modelsLoading}
+          error={modelsError}
           current={effModel}
           onSelect={chooseModel}
           onClose={() => setShowModelPicker(false)}

@@ -1,7 +1,7 @@
 'use strict';
 const fsp = require('fs/promises');
 const path = require('path');
-const { getApiKey } = require('./settings');
+const { getProvider } = require('./settings');
 const { projectDir } = require('./files');
 
 // Session memory = a rolling summary of older conversation, per project.
@@ -49,9 +49,13 @@ ${convo}
 Rewrite the memory as one dense, factual summary (max ~400 words) covering: what the user asked for, what was built or changed (files, stack, commands), key decisions and why, open issues/bugs, and the user's preferences. Keep only durable facts. Output ONLY the summary text.`;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const p = getProvider();
+    if (!p.baseUrl || (p.needsKey && !p.apiKey)) return null;
+    const headers = { 'Content-Type': 'application/json' };
+    if (p.apiKey) headers.Authorization = 'Bearer ' + p.apiKey;
+    const res = await fetch(p.baseUrl + '/chat/completions', {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + getApiKey(), 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.2, max_tokens: 700 }),
     });
     if (!res.ok) return null;

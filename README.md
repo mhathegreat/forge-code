@@ -7,9 +7,10 @@
 **Self-hosted AI coding studio — describe it, watch it get built.**
 
 An open-source, local-first agentic IDE in the spirit of Bolt.new and Claude Code.
-Pick any model on OpenRouter (including free ones), type what you want, and Forge Code
-plans, writes files, runs commands, and verifies the result — asking your permission
-along the way, or running fully autonomous. Your choice.
+Bring any AI provider — OpenRouter, OpenAI, Anthropic, Gemini, Groq, local Ollama, or any
+OpenAI-compatible endpoint — type what you want, and Forge Code plans, writes files, runs
+commands, and verifies the result — asking your permission along the way, or running
+fully autonomous. Your choice.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-7c5cff.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -27,7 +28,7 @@ along the way, or running fully autonomous. Your choice.
 
 - 🖥️ **Full 4-panel IDE in your browser** — project sidebar with live file tree, Monaco editor (the VS Code editor) with tabs, streaming agent chat, and a **real PTY terminal** (xterm.js) scoped to each project
 - 🤖 **Autonomous agent loop** — the model plans, then calls real tools (`read_file`, `write_file`, `create_folder`, `run_command`, `list_files`, `delete_file`, `search_files`) in a think → act → observe loop until the task is done
-- 🎛️ **Any OpenRouter model** — searchable picker over the full catalog (300+) with pricing, context sizes, a **Free only** filter, and per-project model overrides
+- 🎛️ **Any provider, any model** — pick your AI backend: **OpenRouter** (300+ models with pricing and a *Free only* filter), **OpenAI**, **Anthropic**, **Google Gemini**, **Groq**, **Mistral**, **DeepSeek**, **xAI**, **Together**, **Moonshot**, local **Ollama / LM Studio** (no key needed), or any **custom OpenAI-compatible endpoint**. Searchable model picker with per-project overrides and manual model-id entry
 - 🛡️ **Claude Code–style permissions** — three modes per project:
   | Mode | File writes | Deletes & shell commands |
   |------|:-----------:|:------------------------:|
@@ -47,7 +48,7 @@ along the way, or running fully autonomous. Your choice.
 ## Requirements
 
 - **Node.js 20+** (22 recommended)
-- An **[OpenRouter](https://openrouter.ai/keys) API key** (free models work with a free account)
+- An API key for at least one provider — **[OpenRouter](https://openrouter.ai/keys)** is the default (free models work with a free account) — or a local **Ollama / LM Studio**, which needs no key at all
 - Windows, macOS, or Linux
   - On Windows, **Git Bash** is auto-detected and used as the agent/terminal shell (PowerShell fallback). No compiler toolchain needed — the PTY ships prebuilt.
 
@@ -61,7 +62,7 @@ npm run setup   # install + build (one time)
 npm start
 ```
 
-Open **http://localhost:3001** — on first run the app walks you through creating a password and pasting your [OpenRouter API key](https://openrouter.ai/keys) **right in the browser**. No config files to edit. You can view, test, and change the key anytime from **Settings** (⚙️ in the toolbar).
+Open **http://localhost:3001** — on first run the app walks you through creating a password, **choosing an AI provider**, and pasting its API key, all **right in the browser**. No config files to edit. Switch providers, test keys, and change everything anytime from **Settings** (⚙️ in the toolbar).
 
 Then create a project and type something like:
 
@@ -73,14 +74,15 @@ Then create a project and type something like:
 
 ## ⚙️ Configuration
 
-Everything can be configured **in the app** (first-run setup + the ⚙️ Settings panel): password, OpenRouter API key, and default permission mode. Values are stored locally in `settings.json` (gitignored).
+Everything can be configured **in the app** (first-run setup + the ⚙️ Settings panel): password, AI provider + API keys, and default permission mode. Values are stored locally in `settings.json` (gitignored).
 
 Prefer files? A `.env` at the repo root works too — but anything saved in-app takes precedence:
 
 | Variable | Meaning | Default |
 |----------|---------|---------|
 | `APP_PASSWORD` | login password | *(optional — set in-app on first run)* |
-| `OPENROUTER_API_KEY` | your OpenRouter key | *(optional — set in-app)* |
+| `OPENROUTER_API_KEY` | OpenRouter key | *(optional — set in-app)* |
+| `<PROVIDER>_API_KEY` | env fallback for any provider: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, … | *(optional)* |
 | `DEFAULT_MODEL` | default model id | `moonshotai/kimi-k2.6` |
 | `PROJECTS_ROOT` | where projects are stored | `./projects` |
 | `BACKEND_PORT` | backend port | `4000` |
@@ -111,7 +113,7 @@ flowchart LR
         MEM["Memory compactor"]
         PTY["node-pty (Git Bash / bash)"]
     end
-    OR["OpenRouter<br/>300+ models"]
+    OR["AI provider<br/>OpenRouter · OpenAI · Anthropic<br/>Gemini · Groq · Ollama · custom"]
     FS[("projects/<br/>meta · chat · AGENTS.md · memory")]
 
     UI <--> API
@@ -124,7 +126,7 @@ flowchart LR
     WS --- PTY
 ```
 
-- **backend/** — Express + WebSocket: auth, project/file APIs, the streaming agent loop (OpenRouter function-calling), approval broker, session-memory compactor, chokidar live file watching, PTY via [`@lydell/node-pty`](https://github.com/lydell/node-pty) (prebuilt binaries)
+- **backend/** — Express + WebSocket: auth, project/file APIs, the streaming agent loop (OpenAI-compatible function-calling, so it works with every provider), approval broker, session-memory compactor, chokidar live file watching, PTY via [`@lydell/node-pty`](https://github.com/lydell/node-pty) (prebuilt binaries)
 - **frontend/** — Next.js 14 dark-theme IDE
 - **projects/** — your work (gitignored): each project holds `meta.json`, `chat.json`, `AGENTS.md`, `memory.json` + whatever the agent builds
 
@@ -133,7 +135,7 @@ flowchart LR
 - File tools are **sandboxed to the active project directory** (path-escape attempts are rejected).
 - `run_command` executes real shell commands in the project folder — that's the point. Keep **Ask first** on when trying prompts you don't fully trust, and read the approval previews.
 - The app binds to localhost by intent. Don't expose ports 3001/4000 to the internet without adding TLS and real auth in front.
-- Your OpenRouter key never leaves the backend; the browser talks only to Forge Code.
+- Your API keys never leave the backend; the browser talks only to Forge Code.
 
 ## 🧰 Troubleshooting
 

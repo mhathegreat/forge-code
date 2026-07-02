@@ -1,7 +1,7 @@
 'use strict';
 const fsp = require('fs/promises');
 const path = require('path');
-const { getApiKey } = require('./settings');
+const { getProvider } = require('./settings');
 const { toolDefs, execTool } = require('./tools');
 const { buildSystemPrompt } = require('./systemPrompt');
 const { listTree, projectDir, existsSync } = require('./files');
@@ -37,18 +37,22 @@ function buildPreview(projectId, name, args = {}) {
 // Stream one chat completion. Emits {type:'token'} for text deltas.
 // Returns { text, toolCalls, finishReason }.
 async function streamCompletion(messages, emit, model) {
-  const key = getApiKey();
-  if (!key) {
-    throw new Error('No OpenRouter API key configured — add one in Settings (gear icon, top right).');
+  const p = getProvider();
+  if (p.needsKey && !p.apiKey) {
+    throw new Error(`No API key configured for ${p.name} — add one in Settings (gear icon, top right).`);
   }
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  if (!p.baseUrl) {
+    throw new Error('Provider base URL is not set — configure it in Settings.');
+  }
+  const headers = { 'Content-Type': 'application/json' };
+  if (p.apiKey) headers.Authorization = 'Bearer ' + p.apiKey;
+  if (p.id === 'openrouter') {
+    headers['HTTP-Referer'] = 'http://localhost:3001';
+    headers['X-Title'] = 'Forge Code';
+  }
+  const res = await fetch(p.baseUrl + '/chat/completions', {
     method: 'POST',
-    headers: {
-      Authorization: 'Bearer ' + key,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'http://localhost:3001',
-      'X-Title': 'Forge Code',
-    },
+    headers,
     body: JSON.stringify({
       model,
       messages,
@@ -61,7 +65,7 @@ async function streamCompletion(messages, emit, model) {
 
   if (!res.ok || !res.body) {
     const body = await res.text().catch(() => '');
-    throw new Error('OpenRouter ' + res.status + ': ' + body.slice(0, 500));
+    throw new Error(p.name + ' ' + res.status + ': ' + body.slice(0, 500));
   }
 
   let text = '';
