@@ -32,7 +32,7 @@ export default function Login({ onLogin }) {
             <Hammer size={18} className="text-accent" />
           </div>
           <div>
-            <div className="text-lg font-semibold">Forge</div>
+            <div className="text-lg font-semibold">Forge Code</div>
             <div className="text-xs text-gray-500">AI coding studio</div>
           </div>
         </div>

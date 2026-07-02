@@ -1,5 +1,5 @@
 {
-  "name": "forge",
+  "name": "forge-code",
   "version": "2.0.0",
   "private": true,
   "description": "Forge — self-hosted AI coding studio (agentic Bolt.new / Claude Code style IDE)",

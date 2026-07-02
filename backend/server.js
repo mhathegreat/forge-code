@@ -58,7 +58,7 @@ app.post('/api/logout', (req, res) => {
 });
 
 app.get('/api/me', (req, res) => res.json({ authed: isAuthed(req) }));
-app.get('/api/health', (req, res) => res.json({ ok: true, app: 'forge' }));
+app.get('/api/health', (req, res) => res.json({ ok: true, app: 'forge-code' }));
 
 // ---------- settings + models ----------
 app.get('/api/settings', requireAuth, (req, res) => res.json(settings.get()));
@@ -240,10 +240,10 @@ wssAgent.on('connection', (ws, req) => {
 wssPty.on('connection', (ws, req) => {
   let projectId = null;
   try { projectId = new URL(req.url, 'http://x').searchParams.get('project'); } catch {}
-  if (!projectId) { ws.send('\r\n[Forge] No project specified.\r\n'); ws.close(); return; }
+  if (!projectId) { ws.send('\r\n[Forge Code] No project specified.\r\n'); ws.close(); return; }
   attachPty(ws, projectId);
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Forge] backend listening on http://localhost:${PORT}`);
+  console.log(`[Forge Code] backend listening on http://localhost:${PORT}`);
 });

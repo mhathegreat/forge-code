@@ -57,7 +57,7 @@ function Message({ m }) {
       <div className="flex items-center gap-2 mb-1.5">
         {isUser ? <User size={13} className="text-gray-500" /> : <Sparkles size={13} className="text-accent" />}
         <span className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">
-          {isUser ? 'You' : 'Forge'}
+          {isUser ? 'You' : 'Forge Code'}
         </span>
       </div>
       {!isUser && m.tools && m.tools.length > 0 && (
@@ -224,7 +224,7 @@ export default function ChatPanel({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
             }}
-            placeholder={projectSelected ? 'Ask Forge to build something…  (Enter to send)' : 'Select a project first'}
+            placeholder={projectSelected ? 'Ask Forge Code to build something…  (Enter to send)' : 'Select a project first'}
             className="flex-1 bg-transparent text-sm outline-none resize-none max-h-40 disabled:opacity-50"
           />
           <button

@@ -1,5 +1,5 @@
 {
-  "name": "forge-backend",
+  "name": "forge-code-backend",
   "version": "2.0.0",
   "private": true,
   "description": "Forge backend — Express + WebSocket agent + PTY terminal",

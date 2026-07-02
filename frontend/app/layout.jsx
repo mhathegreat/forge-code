@@ -1,11 +1,11 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Forge',
+  title: 'Forge Code',
   description: 'Self-hosted AI coding studio — plan, build, and run software with an autonomous agent.',
   manifest: '/manifest.json',
   icons: { icon: '/icon.svg' },
-  appleWebApp: { capable: true, title: 'Forge', statusBarStyle: 'black-translucent' },
+  appleWebApp: { capable: true, title: 'Forge Code', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport = {

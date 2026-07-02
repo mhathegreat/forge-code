@@ -43,7 +43,7 @@ async function streamCompletion(messages, emit, model) {
       Authorization: 'Bearer ' + OPENROUTER_API_KEY,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'http://localhost:3001',
-      'X-Title': 'Forge',
+      'X-Title': 'Forge Code',
     },
     body: JSON.stringify({
       model,

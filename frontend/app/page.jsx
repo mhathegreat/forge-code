@@ -290,7 +290,7 @@ export default function Home() {
           <div className="w-6 h-6 rounded bg-accent/20 border border-accent/40 flex items-center justify-center">
             <Hammer size={13} className="text-accent" />
           </div>
-          <span className="font-semibold text-sm">Forge</span>
+          <span className="font-semibold text-sm">Forge Code</span>
         </div>
         <div className="text-gray-600">/</div>
         <div className="text-sm text-gray-300 truncate">

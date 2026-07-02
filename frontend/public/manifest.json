@@ -1,6 +1,6 @@
 {
-  "name": "Forge — AI coding studio",
-  "short_name": "Forge",
+  "name": "Forge Code — AI coding studio",
+  "short_name": "Forge Code",
   "description": "Self-hosted AI coding studio. Plan, build, and run software with an autonomous agent.",
   "start_url": "/",
   "display": "standalone",

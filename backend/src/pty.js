@@ -23,7 +23,7 @@ function attachPty(ws, projectId) {
       env: { ...process.env, TERM: 'xterm-256color' },
     });
   } catch (e) {
-    try { ws.send('\r\n[Forge] Failed to start terminal: ' + e.message + '\r\n'); } catch {}
+    try { ws.send('\r\n[Forge Code] Failed to start terminal: ' + e.message + '\r\n'); } catch {}
     return;
   }
 

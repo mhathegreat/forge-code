@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="frontend/public/icon.svg" width="96" alt="Forge logo" />
+<img src="frontend/public/icon.svg" width="96" alt="Forge Code logo" />
 
-# Forge
+# Forge Code
 
 **Self-hosted AI coding studio — describe it, watch it get built.**
 
 An open-source, local-first agentic IDE in the spirit of Bolt.new and Claude Code.
-Pick any model on OpenRouter (including free ones), type what you want, and Forge
+Pick any model on OpenRouter (including free ones), type what you want, and Forge Code
 plans, writes files, runs commands, and verifies the result — asking your permission
 along the way, or running fully autonomous. Your choice.
 
@@ -41,7 +41,7 @@ along the way, or running fully autonomous. Your choice.
   2. `AGENTS.md` — persistent project memory the agent reads every session and updates when it finishes (editable in the UI)
   3. **Automatic context compaction** — once a conversation grows long, older messages are summarized into rolling session memory, so the agent never loses the thread
 - 👀 **Instant preview** — one-click preview for static (`index.html`) projects
-- 📱 **PWA** — install it from Chrome and run Forge in its own window like a desktop app
+- 📱 **PWA** — install it from Chrome and run Forge Code in its own window like a desktop app
 - 🔒 **Single-password login** with a persistent session cookie
 
 ## Requirements
@@ -54,7 +54,8 @@ along the way, or running fully autonomous. Your choice.
 ## 🚀 Quick start
 
 ```bash
-git clone <your-repo-url> forge && cd forge
+git clone https://github.com/mhathegreat/forge-code.git
+cd forge-code
 
 # 1. configure
 cp .env.example .env        # then edit: set APP_PASSWORD and OPENROUTER_API_KEY
@@ -72,7 +73,7 @@ Open **http://localhost:3001**, log in, create a project, and type something lik
 
 …then watch the file tree fill up. For development with hot reload use `npm run dev`.
 
-> **Tip:** in Chrome, ⋮ → *Cast, save and share* → **Install page as app** to get Forge in its own window.
+> **Tip:** in Chrome, ⋮ → *Cast, save and share* → **Install page as app** to get Forge Code in its own window.
 
 ## ⚙️ Configuration
 
@@ -89,7 +90,7 @@ All secrets live in `.env` at the repo root (gitignored):
 
 Runtime settings (default model, default permission mode) persist in `settings.json`; per-project overrides live in each project's `meta.json` — both managed from the UI.
 
-## 🧭 Using Forge
+## 🧭 Using Forge Code
 
 - **Model** — click the model chip in the Agent panel header to open the picker. Free models are badged `FREE` (note: free tiers are often rate-limited upstream by their providers).
 - **Permission mode** — the dropdown next to the model chip. Start with *Ask first*; switch a trusted project to *Full auto* for hands-off builds.
@@ -134,14 +135,14 @@ flowchart LR
 - File tools are **sandboxed to the active project directory** (path-escape attempts are rejected).
 - `run_command` executes real shell commands in the project folder — that's the point. Keep **Ask first** on when trying prompts you don't fully trust, and read the approval previews.
 - The app binds to localhost by intent. Don't expose ports 3001/4000 to the internet without adding TLS and real auth in front.
-- Your OpenRouter key never leaves the backend; the browser talks only to Forge.
+- Your OpenRouter key never leaves the backend; the browser talks only to Forge Code.
 
 ## 🧰 Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
 | `EADDRINUSE` on 3001/4000 | Something else owns the port — change `BACKEND_PORT` in `.env` and/or the `-p` flag in `frontend/package.json` |
-| Free model returns 429 | Upstream free-tier throttling, not a Forge bug — pick another free model or a paid one |
+| Free model returns 429 | Upstream free-tier throttling, not a Forge Code bug — pick another free model or a paid one |
 | Terminal shows PowerShell on Windows | Git Bash wasn't found — install Git for Windows or set `FORGE_SHELL` |
 | Agent "denied" its own actions | Session-long *Always allow* resets on reconnect — that's by design |
 
