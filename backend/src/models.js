@@ -1,5 +1,5 @@
 'use strict';
-const { OPENROUTER_API_KEY } = require('./config');
+const { getApiKey } = require('./settings');
 
 // Cached OpenRouter model catalog (id, name, context, pricing, free flag).
 let cache = { ts: 0, data: null };
@@ -7,8 +7,9 @@ const TTL = 10 * 60 * 1000;
 
 async function listModels(force = false) {
   if (!force && cache.data && Date.now() - cache.ts < TTL) return cache.data;
+  const key = getApiKey();
   const res = await fetch('https://openrouter.ai/api/v1/models', {
-    headers: OPENROUTER_API_KEY ? { Authorization: 'Bearer ' + OPENROUTER_API_KEY } : {},
+    headers: key ? { Authorization: 'Bearer ' + key } : {},
   });
   if (!res.ok) throw new Error('OpenRouter /models returned ' + res.status);
   const json = await res.json();

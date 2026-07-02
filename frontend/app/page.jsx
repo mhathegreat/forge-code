@@ -9,7 +9,8 @@ import TerminalPane from '@/components/TerminalPane';
 import PreviewPane from '@/components/PreviewPane';
 import ModelPicker from '@/components/ModelPicker';
 import MemoryModal from '@/components/MemoryModal';
-import { Terminal as TerminalIcon, Eye, Code2, LogOut, Loader2, Hammer } from 'lucide-react';
+import SettingsModal from '@/components/SettingsModal';
+import { Terminal as TerminalIcon, Eye, Code2, LogOut, Loader2, Hammer, Settings as SettingsIcon } from 'lucide-react';
 
 export default function Home() {
   const [authed, setAuthed] = useState(null); // null = loading
@@ -31,6 +32,7 @@ export default function Home() {
   const [centerView, setCenterView] = useState('editor'); // 'editor' | 'preview'
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [modelsList, setModelsList] = useState(null);
   const [modelsLoading, setModelsLoading] = useState(false);
 
@@ -315,6 +317,9 @@ export default function Home() {
             </button>
           </>
         )}
+        <button onClick={() => setShowSettings(true)} className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs text-gray-400 hover:bg-ink-800" title="Settings (API key, permissions, password)">
+          <SettingsIcon size={14} />
+        </button>
         <button onClick={logout} className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs text-gray-400 hover:bg-ink-800" title="Log out">
           <LogOut size={14} />
         </button>
@@ -399,6 +404,12 @@ export default function Home() {
       )}
       {showMemory && current && (
         <MemoryModal projectId={current} onClose={() => setShowMemory(false)} />
+      )}
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onPasswordChanged={() => { setShowSettings(false); logout(); }}
+        />
       )}
     </div>
   );

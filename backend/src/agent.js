@@ -1,7 +1,7 @@
 'use strict';
 const fsp = require('fs/promises');
 const path = require('path');
-const { OPENROUTER_API_KEY } = require('./config');
+const { getApiKey } = require('./settings');
 const { toolDefs, execTool } = require('./tools');
 const { buildSystemPrompt } = require('./systemPrompt');
 const { listTree, projectDir, existsSync } = require('./files');
@@ -37,10 +37,14 @@ function buildPreview(projectId, name, args = {}) {
 // Stream one chat completion. Emits {type:'token'} for text deltas.
 // Returns { text, toolCalls, finishReason }.
 async function streamCompletion(messages, emit, model) {
+  const key = getApiKey();
+  if (!key) {
+    throw new Error('No OpenRouter API key configured — add one in Settings (gear icon, top right).');
+  }
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: 'Bearer ' + OPENROUTER_API_KEY,
+      Authorization: 'Bearer ' + key,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'http://localhost:3001',
       'X-Title': 'Forge Code',

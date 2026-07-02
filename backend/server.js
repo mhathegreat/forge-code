@@ -7,8 +7,9 @@ const { WebSocketServer } = require('ws');
 const cookieLib = require('cookie');
 const { URL } = require('url');
 
-const { APP_PASSWORD, PORT, SESSION_SECRET } = require('./src/config');
+const { PORT } = require('./src/config');
 const settings = require('./src/settings');
+const auth = require('./src/auth');
 const projects = require('./src/projects');
 const { readFileText, writeFileText, listTree, resolveInProject } = require('./src/files');
 const { runAgent } = require('./src/agent');
@@ -27,28 +28,53 @@ app.use(cors({ origin: true, credentials: true })); // reflect origin, allow coo
 
 // ---------- auth ----------
 function isAuthed(req) {
-  return req.cookies && req.cookies[COOKIE_NAME] === SESSION_SECRET;
+  return req.cookies && req.cookies[COOKIE_NAME] === auth.getSessionSecret();
 }
 function authedFromCookieHeader(header) {
   if (!header) return false;
-  try { return cookieLib.parse(header)[COOKIE_NAME] === SESSION_SECRET; } catch { return false; }
+  try { return cookieLib.parse(header)[COOKIE_NAME] === auth.getSessionSecret(); } catch { return false; }
 }
 function requireAuth(req, res, next) {
   if (isAuthed(req)) return next();
   res.status(401).json({ error: 'unauthorized' });
 }
-
-app.post('/api/login', (req, res) => {
-  const { password } = req.body || {};
-  if (!APP_PASSWORD || password !== APP_PASSWORD) {
-    return res.status(401).json({ error: 'invalid password' });
-  }
-  res.cookie(COOKIE_NAME, SESSION_SECRET, {
+function setSessionCookie(res) {
+  res.cookie(COOKIE_NAME, auth.getSessionSecret(), {
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
     path: '/',
   });
+}
+
+// First-run: does the app still need a password/key? (no auth — it's the
+// signal the login page uses to decide which form to show)
+app.get('/api/setup-status', (req, res) => {
+  res.json({ needsSetup: auth.needsSetup(), hasKey: !!settings.getApiKey() });
+});
+
+// First-run setup: create the password (and optionally save the API key)
+// right from the browser. Only works while no password is configured.
+app.post('/api/setup', (req, res) => {
+  if (!auth.needsSetup()) return res.status(403).json({ error: 'already configured' });
+  const { password, openrouterApiKey } = req.body || {};
+  if (!password || String(password).length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
+  auth.setPassword(String(password));
+  if (openrouterApiKey && String(openrouterApiKey).trim()) {
+    settings.setSecret({ openrouterApiKey: String(openrouterApiKey).trim() });
+  }
+  setSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.post('/api/login', (req, res) => {
+  const { password } = req.body || {};
+  if (!auth.verifyPassword(password)) {
+    return res.status(401).json({ error: 'invalid password' });
+  }
+  setSessionCookie(res);
   res.json({ ok: true });
 });
 
@@ -61,10 +87,50 @@ app.get('/api/me', (req, res) => res.json({ authed: isAuthed(req) }));
 app.get('/api/health', (req, res) => res.json({ ok: true, app: 'forge-code' }));
 
 // ---------- settings + models ----------
-app.get('/api/settings', requireAuth, (req, res) => res.json(settings.get()));
+app.get('/api/settings', requireAuth, (req, res) => res.json(settings.getPublic()));
+
 app.put('/api/settings', requireAuth, (req, res) => {
-  try { res.json(settings.set(req.body || {})); }
-  catch (e) { res.status(400).json({ error: e.message }); }
+  try {
+    const body = req.body || {};
+    let passwordChanged = false;
+
+    settings.set(body); // preference fields (whitelisted inside)
+
+    if (body.openrouterApiKey !== undefined) {
+      const key = String(body.openrouterApiKey || '').trim();
+      settings.setSecret({ openrouterApiKey: key }); // '' clears → falls back to .env
+    }
+    if (body.newPassword !== undefined && body.newPassword !== '') {
+      if (String(body.newPassword).length < 4) {
+        return res.status(400).json({ error: 'Password must be at least 4 characters' });
+      }
+      auth.setPassword(String(body.newPassword));
+      passwordChanged = true; // old session cookies are now invalid
+    }
+    res.json({ ...settings.getPublic(), passwordChanged });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Validate an OpenRouter key (the typed one, or the currently effective one).
+app.post('/api/settings/test-key', requireAuth, async (req, res) => {
+  const key = (req.body && req.body.key && String(req.body.key).trim()) || settings.getApiKey();
+  if (!key) return res.json({ valid: false, error: 'No key to test' });
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/key', {
+      headers: { Authorization: 'Bearer ' + key },
+    });
+    if (!r.ok) return res.json({ valid: false, error: 'OpenRouter rejected the key (HTTP ' + r.status + ')' });
+    const json = await r.json();
+    const d = json.data || {};
+    res.json({
+      valid: true,
+      label: d.label || null,
+      usage: typeof d.usage === 'number' ? d.usage : null,
+      freeTier: !!d.is_free_tier,
+    });
+  } catch (e) {
+    res.json({ valid: false, error: e.message });
+  }
 });
 
 app.get('/api/models', requireAuth, async (req, res) => {
@@ -246,4 +312,7 @@ wssPty.on('connection', (ws, req) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Forge Code] backend listening on http://localhost:${PORT}`);
+  if (auth.needsSetup()) {
+    console.log('[Forge Code] First run: open the app in your browser to create a password and add your OpenRouter key.');
+  }
 });

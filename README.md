@@ -57,17 +57,13 @@ along the way, or running fully autonomous. Your choice.
 git clone https://github.com/mhathegreat/forge-code.git
 cd forge-code
 
-# 1. configure
-cp .env.example .env        # then edit: set APP_PASSWORD and OPENROUTER_API_KEY
-
-# 2. install + build (one time)
-npm run setup
-
-# 3. run
+npm run setup   # install + build (one time)
 npm start
 ```
 
-Open **http://localhost:3001**, log in, create a project, and type something like:
+Open **http://localhost:3001** — on first run the app walks you through creating a password and pasting your [OpenRouter API key](https://openrouter.ai/keys) **right in the browser**. No config files to edit. You can view, test, and change the key anytime from **Settings** (⚙️ in the toolbar).
+
+Then create a project and type something like:
 
 > *build me a portfolio website with a projects gallery and a contact form*
 
@@ -77,12 +73,14 @@ Open **http://localhost:3001**, log in, create a project, and type something lik
 
 ## ⚙️ Configuration
 
-All secrets live in `.env` at the repo root (gitignored):
+Everything can be configured **in the app** (first-run setup + the ⚙️ Settings panel): password, OpenRouter API key, and default permission mode. Values are stored locally in `settings.json` (gitignored).
+
+Prefer files? A `.env` at the repo root works too — but anything saved in-app takes precedence:
 
 | Variable | Meaning | Default |
 |----------|---------|---------|
-| `APP_PASSWORD` | login password | *(required)* |
-| `OPENROUTER_API_KEY` | your OpenRouter key | *(required)* |
+| `APP_PASSWORD` | login password | *(optional — set in-app on first run)* |
+| `OPENROUTER_API_KEY` | your OpenRouter key | *(optional — set in-app)* |
 | `DEFAULT_MODEL` | default model id | `moonshotai/kimi-k2.6` |
 | `PROJECTS_ROOT` | where projects are stored | `./projects` |
 | `BACKEND_PORT` | backend port | `4000` |

@@ -1,7 +1,7 @@
 'use strict';
 const fsp = require('fs/promises');
 const path = require('path');
-const { OPENROUTER_API_KEY } = require('./config');
+const { getApiKey } = require('./settings');
 const { projectDir } = require('./files');
 
 // Session memory = a rolling summary of older conversation, per project.
@@ -51,7 +51,7 @@ Rewrite the memory as one dense, factual summary (max ~400 words) covering: what
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + OPENROUTER_API_KEY, 'Content-Type': 'application/json' },
+      headers: { Authorization: 'Bearer ' + getApiKey(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.2, max_tokens: 700 }),
     });
     if (!res.ok) return null;

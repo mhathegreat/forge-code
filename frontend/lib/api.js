@@ -29,8 +29,11 @@ const enc = encodeURIComponent;
 
 export const api = {
   me: () => req('/api/me'),
+  setupStatus: () => req('/api/setup-status'),
+  setup: (body) => req('/api/setup', { method: 'POST', body: JSON.stringify(body) }),
   login: (password) => req('/api/login', { method: 'POST', body: JSON.stringify({ password }) }),
   logout: () => req('/api/logout', { method: 'POST' }),
+  testKey: (key) => req('/api/settings/test-key', { method: 'POST', body: JSON.stringify({ key }) }),
 
   settings: () => req('/api/settings'),
   saveSettings: (body) => req('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
