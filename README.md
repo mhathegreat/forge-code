@@ -1,28 +1,63 @@
+<div align="center">
+
+<img src="frontend/public/icon.svg" width="96" alt="Forge logo" />
+
 # Forge
 
-A self-hosted, browser-based **AI coding studio** — an open-source Bolt.new / Claude Code style agentic IDE that runs entirely on your own machine. Pick any model on OpenRouter (including free ones), describe what you want, and Forge plans, writes files, runs commands, and verifies the result — with a permission system so it only does what you allow.
+**Self-hosted AI coding studio — describe it, watch it get built.**
 
-## Features
+An open-source, local-first agentic IDE in the spirit of Bolt.new and Claude Code.
+Pick any model on OpenRouter (including free ones), type what you want, and Forge
+plans, writes files, runs commands, and verifies the result — asking your permission
+along the way, or running fully autonomous. Your choice.
 
-- **4-panel IDE** — project & live file-tree sidebar, Monaco editor with tabs, streaming agent chat, real PTY terminal (xterm.js)
-- **Autonomous agent loop** — 7 tools (read/write/create/delete/list/search/run_command), plan → act → observe until done
-- **Any OpenRouter model** — searchable picker over the full catalog with pricing and a *Free only* filter; per-project model override
-- **Claude Code–style permissions** — three modes per project: **Ask first** (approve writes & commands), **Auto edits** (approve only commands/deletes), **Full auto**; approve inline with *Allow / Always allow / Deny*
-- **Real memory** — full chat history per project, editable `AGENTS.md` persistent memory, and **automatic context compaction** (older conversation is summarized into rolling session memory so long sessions never lose the thread)
-- **Static preview** — one-click preview of `index.html`-based projects
-- **PWA** — open `http://localhost:3001` in Chrome and “Install app” to run Forge in its own window
+[![License: MIT](https://img.shields.io/badge/License-MIT-7c5cff.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![OpenRouter](https://img.shields.io/badge/models-OpenRouter%20(300%2B)-8b5cf6)](https://openrouter.ai/models)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555)](#requirements)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+
+<!-- TODO: add a screenshot or demo GIF here: docs/screenshot.png -->
+
+</div>
+
+---
+
+## ✨ Features
+
+- 🖥️ **Full 4-panel IDE in your browser** — project sidebar with live file tree, Monaco editor (the VS Code editor) with tabs, streaming agent chat, and a **real PTY terminal** (xterm.js) scoped to each project
+- 🤖 **Autonomous agent loop** — the model plans, then calls real tools (`read_file`, `write_file`, `create_folder`, `run_command`, `list_files`, `delete_file`, `search_files`) in a think → act → observe loop until the task is done
+- 🎛️ **Any OpenRouter model** — searchable picker over the full catalog (300+) with pricing, context sizes, a **Free only** filter, and per-project model overrides
+- 🛡️ **Claude Code–style permissions** — three modes per project:
+  | Mode | File writes | Deletes & shell commands |
+  |------|:-----------:|:------------------------:|
+  | **Ask first** (default) | 🙋 approve | 🙋 approve |
+  | **Auto edits** | ✅ auto | 🙋 approve |
+  | **Full auto** | ✅ auto | ✅ auto |
+
+  Approvals appear inline with a preview of exactly what will happen — **Allow**, **Always allow** (for the session), or **Deny**. Denied actions are fed back to the model so it adapts instead of failing.
+- 🧠 **Real memory** — three layers per project:
+  1. Full chat history, persisted and reloaded across sessions
+  2. `AGENTS.md` — persistent project memory the agent reads every session and updates when it finishes (editable in the UI)
+  3. **Automatic context compaction** — once a conversation grows long, older messages are summarized into rolling session memory, so the agent never loses the thread
+- 👀 **Instant preview** — one-click preview for static (`index.html`) projects
+- 📱 **PWA** — install it from Chrome and run Forge in its own window like a desktop app
+- 🔒 **Single-password login** with a persistent session cookie
 
 ## Requirements
 
-- Node.js 20+ (22 recommended)
-- An [OpenRouter](https://openrouter.ai) API key
-- Windows, macOS, or Linux (on Windows, Git Bash is auto-detected and used as the agent/terminal shell)
+- **Node.js 20+** (22 recommended)
+- An **[OpenRouter](https://openrouter.ai/keys) API key** (free models work with a free account)
+- Windows, macOS, or Linux
+  - On Windows, **Git Bash** is auto-detected and used as the agent/terminal shell (PowerShell fallback). No compiler toolchain needed — the PTY ships prebuilt.
 
-## Quick start
+## 🚀 Quick start
 
 ```bash
+git clone <your-repo-url> forge && cd forge
+
 # 1. configure
-cp .env.example .env     # then edit: set APP_PASSWORD and OPENROUTER_API_KEY
+cp .env.example .env        # then edit: set APP_PASSWORD and OPENROUTER_API_KEY
 
 # 2. install + build (one time)
 npm run setup
@@ -31,30 +66,97 @@ npm run setup
 npm start
 ```
 
-Open **http://localhost:3001**, log in with your `APP_PASSWORD`, create a project, and tell the agent what to build.
+Open **http://localhost:3001**, log in, create a project, and type something like:
 
-For development with hot reload: `npm run dev`.
+> *build me a portfolio website with a projects gallery and a contact form*
 
-## Configuration (`.env`)
+…then watch the file tree fill up. For development with hot reload use `npm run dev`.
 
-| var | meaning | default |
-|-----|---------|---------|
+> **Tip:** in Chrome, ⋮ → *Cast, save and share* → **Install page as app** to get Forge in its own window.
+
+## ⚙️ Configuration
+
+All secrets live in `.env` at the repo root (gitignored):
+
+| Variable | Meaning | Default |
+|----------|---------|---------|
 | `APP_PASSWORD` | login password | *(required)* |
-| `OPENROUTER_API_KEY` | OpenRouter key | *(required)* |
+| `OPENROUTER_API_KEY` | your OpenRouter key | *(required)* |
 | `DEFAULT_MODEL` | default model id | `moonshotai/kimi-k2.6` |
-| `PROJECTS_ROOT` | where projects live | `./projects` |
+| `PROJECTS_ROOT` | where projects are stored | `./projects` |
 | `BACKEND_PORT` | backend port | `4000` |
-| `FORGE_SHELL` | override shell path | auto (Git Bash → PowerShell) |
+| `FORGE_SHELL` | override the shell binary | auto (Git Bash → PowerShell) |
 
-Global runtime settings (default model / permission mode) persist in `settings.json`; per-project overrides live in each project's `meta.json`.
+Runtime settings (default model, default permission mode) persist in `settings.json`; per-project overrides live in each project's `meta.json` — both managed from the UI.
 
-## Architecture
+## 🧭 Using Forge
 
-- **backend/** — Express + WebSocket (`:4000`): auth, project/file APIs, the agent loop (OpenRouter function-calling with streaming), approval broker, session-memory compactor, chokidar live file watch, and a real PTY via `@lydell/node-pty` (prebuilt — no compiler needed).
-- **frontend/** — Next.js 14 dark-theme IDE (`:3001`): Monaco, xterm.js, model picker, approval cards, memory panel.
-- **projects/** — your projects (gitignored). Each contains `meta.json`, `AGENTS.md`, `chat.json`, `memory.json` plus the code the agent writes.
+- **Model** — click the model chip in the Agent panel header to open the picker. Free models are badged `FREE` (note: free tiers are often rate-limited upstream by their providers).
+- **Permission mode** — the dropdown next to the model chip. Start with *Ask first*; switch a trusted project to *Full auto* for hands-off builds.
+- **Memory** — the 🧠 button opens the project's `AGENTS.md` (editable) and the auto-compacted session summary.
+- **Terminal** — toggle with the Terminal button. It's a real shell in the project directory; whatever the agent installs, you can run.
+- **Preview** — for static sites, the Preview button renders `index.html` in an iframe. For dev-server projects (Next.js, Vite…), run `npm run dev` in the terminal and open the port it prints.
 
-## Safety notes
+## 🏗️ Architecture
 
-- File tools are sandboxed to the active project directory. `run_command` runs real shell commands in the project folder — that's the point — so keep permission mode on **Ask first** when trying untrusted prompts.
-- The login cookie is derived from your password; anyone on your LAN who knows the password can use the app. Don't expose the ports to the internet without adding TLS + proper auth.
+```mermaid
+flowchart LR
+    subgraph Browser["Browser (localhost:3001)"]
+        UI["Next.js IDE<br/>Monaco · xterm.js · chat"]
+    end
+    subgraph Backend["Node backend (localhost:4000)"]
+        API["Express REST<br/>auth · projects · files"]
+        WS["WebSocket<br/>agent events · PTY"]
+        AGENT["Agent loop<br/>plan → tools → observe"]
+        BROKER["Approval broker"]
+        MEM["Memory compactor"]
+        PTY["node-pty (Git Bash / bash)"]
+    end
+    OR["OpenRouter<br/>300+ models"]
+    FS[("projects/<br/>meta · chat · AGENTS.md · memory")]
+
+    UI <--> API
+    UI <--> WS
+    WS --- AGENT
+    AGENT <--> BROKER
+    AGENT <--> OR
+    AGENT <--> FS
+    MEM <--> FS
+    WS --- PTY
+```
+
+- **backend/** — Express + WebSocket: auth, project/file APIs, the streaming agent loop (OpenRouter function-calling), approval broker, session-memory compactor, chokidar live file watching, PTY via [`@lydell/node-pty`](https://github.com/lydell/node-pty) (prebuilt binaries)
+- **frontend/** — Next.js 14 dark-theme IDE
+- **projects/** — your work (gitignored): each project holds `meta.json`, `chat.json`, `AGENTS.md`, `memory.json` + whatever the agent builds
+
+## 🔐 Security notes
+
+- File tools are **sandboxed to the active project directory** (path-escape attempts are rejected).
+- `run_command` executes real shell commands in the project folder — that's the point. Keep **Ask first** on when trying prompts you don't fully trust, and read the approval previews.
+- The app binds to localhost by intent. Don't expose ports 3001/4000 to the internet without adding TLS and real auth in front.
+- Your OpenRouter key never leaves the backend; the browser talks only to Forge.
+
+## 🧰 Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `EADDRINUSE` on 3001/4000 | Something else owns the port — change `BACKEND_PORT` in `.env` and/or the `-p` flag in `frontend/package.json` |
+| Free model returns 429 | Upstream free-tier throttling, not a Forge bug — pick another free model or a paid one |
+| Terminal shows PowerShell on Windows | Git Bash wasn't found — install Git for Windows or set `FORGE_SHELL` |
+| Agent "denied" its own actions | Session-long *Always allow* resets on reconnect — that's by design |
+
+## 🗺️ Roadmap
+
+- [ ] Dev-server preview proxy (live preview for Next/Vite projects, not just static)
+- [ ] Diff view for file-write approvals
+- [ ] Multi-agent runs / background tasks
+- [ ] Git integration (auto-commit checkpoints per agent run)
+- [ ] Token/cost meter per run
+
+## Contributing
+
+Issues and PRs welcome. Keep changes focused, match the existing style, and test the approval flow in *Ask first* mode before submitting agent-loop changes.
+
+## License
+
+[MIT](LICENSE)
