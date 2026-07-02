@@ -1,8 +1,12 @@
 'use strict';
 const fsp = require('fs/promises');
-const path = require('path');
 const { exec } = require('child_process');
-const { projectDir, resolveInProject, readFileText, writeFileText, listFilePaths, IGNORE_DIRS } = require('./files');
+const { SHELL } = require('./config');
+const { projectDir, resolveInProject, readFileText, writeFileText, listFilePaths } = require('./files');
+
+const shellNote = SHELL.kind === 'bash'
+  ? 'The shell is bash (POSIX syntax; && works, forward slashes for paths).'
+  : 'The shell is PowerShell (use ; to chain commands, NOT &&).';
 
 // ---- Tool schemas (OpenAI/OpenRouter function-calling format) ----
 const toolDefs = [
@@ -49,7 +53,7 @@ const toolDefs = [
     type: 'function',
     function: {
       name: 'run_command',
-      description: 'Run a shell command in the project root directory. Use for npm install, scaffolding, git, builds, etc. Returns combined stdout/stderr and the exit code. Non-interactive only — do not start long-running foreground servers (they will time out); use background (&) sparingly.',
+      description: `Run a shell command in the project root directory. ${shellNote} Use for npm install, scaffolding, git, builds, etc. Returns combined stdout/stderr and the exit code. Non-interactive only — do not start long-running foreground servers (they will time out).`,
       parameters: {
         type: 'object',
         properties: { command: { type: 'string', description: 'The shell command to execute' } },
@@ -96,7 +100,14 @@ const toolDefs = [
 
 function runShell(cwd, command, timeoutMs = 600000) {
   return new Promise((resolve) => {
-    exec(command, { cwd, timeout: timeoutMs, maxBuffer: 1024 * 1024 * 16, env: process.env, shell: '/bin/bash' }, (err, stdout, stderr) => {
+    exec(command, {
+      cwd,
+      timeout: timeoutMs,
+      maxBuffer: 1024 * 1024 * 16,
+      env: process.env,
+      shell: SHELL.shell,
+      windowsHide: true,
+    }, (err, stdout, stderr) => {
       const code = err && typeof err.code === 'number' ? err.code : err ? 1 : 0;
       let out = '';
       if (stdout) out += stdout;

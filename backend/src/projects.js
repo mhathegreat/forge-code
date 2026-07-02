@@ -58,7 +58,15 @@ async function listProjects() {
     } catch { /* legacy project without meta.json */ }
     let mtime = 0;
     try { mtime = (await fsp.stat(path.join(PROJECTS_ROOT, e.name))).mtimeMs; } catch {}
-    projects.push({ id: e.name, name: meta.name || e.name, description: meta.description || '', stack: meta.stack || '', mtime });
+    projects.push({
+      id: e.name,
+      name: meta.name || e.name,
+      description: meta.description || '',
+      stack: meta.stack || '',
+      model: meta.model || '',
+      permissionMode: meta.permissionMode || '',
+      mtime,
+    });
   }
   projects.sort((a, b) => b.mtime - a.mtime);
   return projects;
@@ -77,7 +85,14 @@ async function createProject({ name, description = '', stack = '' }) {
   }
   const dir = path.join(PROJECTS_ROOT, id);
   await fsp.mkdir(dir, { recursive: true });
-  const meta = { name: String(name).trim(), description: String(description || ''), stack: String(stack || ''), createdAt: new Date().toISOString() };
+  const meta = {
+    name: String(name).trim(),
+    description: String(description || ''),
+    stack: String(stack || ''),
+    model: '',          // '' = inherit global default
+    permissionMode: '', // '' = inherit global default
+    createdAt: new Date().toISOString(),
+  };
   await fsp.writeFile(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2));
   await fsp.writeFile(path.join(dir, 'AGENTS.md'), agentsTemplate(meta));
   await fsp.writeFile(path.join(dir, 'chat.json'), '[]');
@@ -96,8 +111,19 @@ async function getMeta(id) {
   try {
     return JSON.parse(await fsp.readFile(path.join(projectDir(id), 'meta.json'), 'utf8'));
   } catch {
-    return { name: id, description: '', stack: '' };
+    return { name: id, description: '', stack: '', model: '', permissionMode: '' };
   }
+}
+
+// Merge whitelisted fields into meta.json (per-project model/mode overrides).
+async function patchMeta(id, patch) {
+  const meta = await getMeta(id);
+  const allowed = ['name', 'description', 'stack', 'model', 'permissionMode'];
+  for (const k of allowed) {
+    if (patch && patch[k] !== undefined) meta[k] = String(patch[k] ?? '');
+  }
+  await fsp.writeFile(path.join(projectDir(id), 'meta.json'), JSON.stringify(meta, null, 2));
+  return meta;
 }
 
 async function readChat(id) {
@@ -115,4 +141,4 @@ async function appendChat(id, ...messages) {
   return chat;
 }
 
-module.exports = { slugify, listProjects, createProject, deleteProject, getMeta, readChat, appendChat };
+module.exports = { slugify, listProjects, createProject, deleteProject, getMeta, patchMeta, readChat, appendChat };

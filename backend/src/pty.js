@@ -1,14 +1,21 @@
 'use strict';
-const pty = require('node-pty');
+// Prefer @lydell/node-pty (ships prebuilt binaries for every platform — no
+// compiler toolchain needed on Windows); fall back to node-pty if present.
+let pty;
+try { pty = require('@lydell/node-pty'); }
+catch { pty = require('node-pty'); }
+
+const { SHELL, IS_WIN } = require('./config');
 const { projectDir } = require('./files');
 
-// Attach a PTY (bash) to a websocket connection. The PTY's cwd is the project
-// directory so the user's terminal is scoped to the project they're working on.
+// Attach a PTY to a websocket connection. The PTY's cwd is the project
+// directory so the terminal is scoped to the project being worked on.
 function attachPty(ws, projectId) {
   const cwd = projectDir(projectId);
+  const args = SHELL.kind === 'bash' ? (IS_WIN ? [] : ['-l']) : ['-NoLogo'];
   let shell;
   try {
-    shell = pty.spawn('/bin/bash', ['-l'], {
+    shell = pty.spawn(SHELL.shell, args, {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
@@ -16,7 +23,7 @@ function attachPty(ws, projectId) {
       env: { ...process.env, TERM: 'xterm-256color' },
     });
   } catch (e) {
-    try { ws.send('\r\n[KimiStudio] Failed to start terminal: ' + e.message + '\r\n'); } catch {}
+    try { ws.send('\r\n[Forge] Failed to start terminal: ' + e.message + '\r\n'); } catch {}
     return;
   }
 

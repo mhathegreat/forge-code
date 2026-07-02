@@ -32,11 +32,17 @@ export const api = {
   login: (password) => req('/api/login', { method: 'POST', body: JSON.stringify({ password }) }),
   logout: () => req('/api/logout', { method: 'POST' }),
 
+  settings: () => req('/api/settings'),
+  saveSettings: (body) => req('/api/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  models: () => req('/api/models'),
+
   projects: () => req('/api/projects'),
   createProject: (body) => req('/api/projects', { method: 'POST', body: JSON.stringify(body) }),
   deleteProject: (id) => req('/api/projects/' + enc(id), { method: 'DELETE' }),
 
   meta: (id) => req(`/api/projects/${enc(id)}/meta`),
+  patchMeta: (id, body) => req(`/api/projects/${enc(id)}/meta`, { method: 'PATCH', body: JSON.stringify(body) }),
+  memory: (id) => req(`/api/projects/${enc(id)}/memory`),
   tree: (id) => req(`/api/projects/${enc(id)}/tree`),
   file: (id, path) => req(`/api/projects/${enc(id)}/file?path=${enc(path)}`),
   saveFile: (id, path, content) =>
@@ -61,3 +67,15 @@ export function langForPath(p = '') {
   if (p.toLowerCase().endsWith('dockerfile')) return 'dockerfile';
   return map[ext] || 'plaintext';
 }
+
+// Short display name for a model id, e.g. "moonshotai/kimi-k2.6" -> "kimi-k2.6".
+export function shortModel(id = '') {
+  const parts = String(id).split('/');
+  return parts[parts.length - 1] || id;
+}
+
+export const MODE_LABELS = {
+  ask: 'Ask first',
+  'auto-edit': 'Auto edits',
+  auto: 'Full auto',
+};

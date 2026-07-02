@@ -1,8 +1,15 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'KimiStudio',
-  description: 'Self-hosted agentic coding studio powered by Kimi K2.6',
+  title: 'Forge',
+  description: 'Self-hosted AI coding studio — plan, build, and run software with an autonomous agent.',
+  manifest: '/manifest.json',
+  icons: { icon: '/icon.svg' },
+  appleWebApp: { capable: true, title: 'Forge', statusBarStyle: 'black-translucent' },
+};
+
+export const viewport = {
+  themeColor: '#0a0a0b',
 };
 
 export default function RootLayout({ children }) {

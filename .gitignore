@@ -5,6 +5,10 @@ node_modules/
 # secrets / local config
 .env
 *.local
+settings.json
+
+# user projects (created inside the app)
+projects/
 
 # next.js
 frontend/.next/
@@ -16,13 +20,9 @@ dist/
 build/
 *.tsbuildinfo
 
-# node-pty native build
-backend/node_modules/node-pty/build/
-
 # logs
 *.log
 npm-debug.log*
-.pm2/
 
 # os / editor
 .DS_Store

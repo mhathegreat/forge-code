@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { Terminal as TerminalIcon, Loader2 } from 'lucide-react';
+import { Hammer, Loader2 } from 'lucide-react';
 
 export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
@@ -29,14 +29,16 @@ export default function Login({ onLogin }) {
       >
         <div className="flex items-center gap-2 mb-1">
           <div className="w-9 h-9 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
-            <TerminalIcon size={18} className="text-accent" />
+            <Hammer size={18} className="text-accent" />
           </div>
           <div>
-            <div className="text-lg font-semibold">KimiStudio</div>
-            <div className="text-xs text-gray-500">Agentic coding · Kimi K2.6</div>
+            <div className="text-lg font-semibold">Forge</div>
+            <div className="text-xs text-gray-500">AI coding studio</div>
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-3 mb-4">Enter your password to continue.</p>
+        <p className="text-xs text-gray-500 mt-3 mb-4">
+          Enter your password (set as <span className="font-mono">APP_PASSWORD</span> in .env).
+        </p>
         <input
           type="password"
           autoFocus

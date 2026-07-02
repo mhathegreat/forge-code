@@ -1,0 +1,14 @@
+{
+  "name": "forge",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Forge — self-hosted AI coding studio (agentic Bolt.new / Claude Code style IDE)",
+  "scripts": {
+    "setup": "npm install --no-audit --no-fund && npm --prefix backend install --no-audit --no-fund && npm --prefix frontend install --no-audit --no-fund && npm --prefix frontend run build",
+    "start": "concurrently -n backend,frontend -c blue,magenta \"npm --prefix backend start\" \"npm --prefix frontend start\"",
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm --prefix backend start\" \"npm --prefix frontend run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

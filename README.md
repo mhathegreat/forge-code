@@ -1,35 +1,60 @@
-# KimiStudio
+# Forge
 
-A self-hosted, browser-based **agentic coding IDE** (a Bolt.new / Claude Code clone) powered by **Kimi K2.6** via OpenRouter.
+A self-hosted, browser-based **AI coding studio** — an open-source Bolt.new / Claude Code style agentic IDE that runs entirely on your own machine. Pick any model on OpenRouter (including free ones), describe what you want, and Forge plans, writes files, runs commands, and verifies the result — with a permission system so it only does what you allow.
 
-- **Backend** — Node.js + Express + WebSocket (`:4000`): auth, project CRUD, file ops, the agent loop (OpenRouter function-calling), live FS watch, and a real PTY terminal via `node-pty`.
-- **Frontend** — Next.js (dark theme) (`:3001`): 4-panel IDE — projects + live file tree sidebar, Monaco editor with tabs, streaming AI chat with tool-call cards, and an Xterm.js terminal. Plus a static preview iframe.
-- **Projects** live at `/mnt/data/kimi-projects/<name>/` (the `_kimistudio` app folder is hidden from the project list).
-- **Process manager** — PM2 (`ecosystem.config.js`), auto-restart on reboot.
+## Features
 
-## Run
+- **4-panel IDE** — project & live file-tree sidebar, Monaco editor with tabs, streaming agent chat, real PTY terminal (xterm.js)
+- **Autonomous agent loop** — 7 tools (read/write/create/delete/list/search/run_command), plan → act → observe until done
+- **Any OpenRouter model** — searchable picker over the full catalog with pricing and a *Free only* filter; per-project model override
+- **Claude Code–style permissions** — three modes per project: **Ask first** (approve writes & commands), **Auto edits** (approve only commands/deletes), **Full auto**; approve inline with *Allow / Always allow / Deny*
+- **Real memory** — full chat history per project, editable `AGENTS.md` persistent memory, and **automatic context compaction** (older conversation is summarized into rolling session memory so long sessions never lose the thread)
+- **Static preview** — one-click preview of `index.html`-based projects
+- **PWA** — open `http://localhost:3001` in Chrome and “Install app” to run Forge in its own window
+
+## Requirements
+
+- Node.js 20+ (22 recommended)
+- An [OpenRouter](https://openrouter.ai) API key
+- Windows, macOS, or Linux (on Windows, Git Bash is auto-detected and used as the agent/terminal shell)
+
+## Quick start
 
 ```bash
-# backend
-cd backend && npm install
-# frontend
-cd ../frontend && npm install && npm run build
-# both, under pm2 (from the project root)
-pm2 start ecosystem.config.js && pm2 save
+# 1. configure
+cp .env.example .env     # then edit: set APP_PASSWORD and OPENROUTER_API_KEY
+
+# 2. install + build (one time)
+npm run setup
+
+# 3. run
+npm start
 ```
 
-Open **http://192.168.4.21:3001** and log in with the password from `.env` (`APP_PASSWORD`).
+Open **http://localhost:3001**, log in with your `APP_PASSWORD`, create a project, and tell the agent what to build.
 
-## Config (`.env` at project root)
+For development with hot reload: `npm run dev`.
 
-| var | meaning |
-|-----|---------|
-| `APP_PASSWORD` | single login password |
-| `OPENROUTER_API_KEY` | OpenRouter key |
-| `KIMI_MODEL` | model id (default `moonshotai/kimi-k2.6`) |
-| `PROJECTS_ROOT` | where projects are stored (`/mnt/data/kimi-projects`) |
-| `BACKEND_PORT` | backend port (default `4000`) |
+## Configuration (`.env`)
 
-## Agent tools
+| var | meaning | default |
+|-----|---------|---------|
+| `APP_PASSWORD` | login password | *(required)* |
+| `OPENROUTER_API_KEY` | OpenRouter key | *(required)* |
+| `DEFAULT_MODEL` | default model id | `moonshotai/kimi-k2.6` |
+| `PROJECTS_ROOT` | where projects live | `./projects` |
+| `BACKEND_PORT` | backend port | `4000` |
+| `FORGE_SHELL` | override shell path | auto (Git Bash → PowerShell) |
 
-`read_file`, `write_file`, `create_folder`, `run_command`, `list_files`, `delete_file`, `search_files` — all sandboxed to the active project directory (except `run_command`, which runs on the host in the project dir). The agent plans, calls tools in a loop, and updates each project's `AGENTS.md` at the end of a session.
+Global runtime settings (default model / permission mode) persist in `settings.json`; per-project overrides live in each project's `meta.json`.
+
+## Architecture
+
+- **backend/** — Express + WebSocket (`:4000`): auth, project/file APIs, the agent loop (OpenRouter function-calling with streaming), approval broker, session-memory compactor, chokidar live file watch, and a real PTY via `@lydell/node-pty` (prebuilt — no compiler needed).
+- **frontend/** — Next.js 14 dark-theme IDE (`:3001`): Monaco, xterm.js, model picker, approval cards, memory panel.
+- **projects/** — your projects (gitignored). Each contains `meta.json`, `AGENTS.md`, `chat.json`, `memory.json` plus the code the agent writes.
+
+## Safety notes
+
+- File tools are sandboxed to the active project directory. `run_command` runs real shell commands in the project folder — that's the point — so keep permission mode on **Ask first** when trying untrusted prompts.
+- The login cookie is derived from your password; anyone on your LAN who knows the password can use the app. Don't expose the ports to the internet without adding TLS + proper auth.

@@ -8,13 +8,17 @@ const cookieLib = require('cookie');
 const { URL } = require('url');
 
 const { APP_PASSWORD, PORT, SESSION_SECRET } = require('./src/config');
+const settings = require('./src/settings');
 const projects = require('./src/projects');
-const { readFileText, writeFileText, listTree, resolveInProject, existsSync } = require('./src/files');
+const { readFileText, writeFileText, listTree, resolveInProject } = require('./src/files');
 const { runAgent } = require('./src/agent');
 const { attachPty } = require('./src/pty');
 const { subscribe } = require('./src/watcher');
+const { listModels } = require('./src/models');
+const { ApprovalBroker } = require('./src/approvals');
+const { readMemory, maybeCompact } = require('./src/memory');
 
-const COOKIE_NAME = 'kimi_session';
+const COOKIE_NAME = 'forge_session';
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json({ limit: '8mb' }));
@@ -54,7 +58,19 @@ app.post('/api/logout', (req, res) => {
 });
 
 app.get('/api/me', (req, res) => res.json({ authed: isAuthed(req) }));
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/health', (req, res) => res.json({ ok: true, app: 'forge' }));
+
+// ---------- settings + models ----------
+app.get('/api/settings', requireAuth, (req, res) => res.json(settings.get()));
+app.put('/api/settings', requireAuth, (req, res) => {
+  try { res.json(settings.set(req.body || {})); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.get('/api/models', requireAuth, async (req, res) => {
+  try { res.json(await listModels()); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
 
 // ---------- projects ----------
 app.get('/api/projects', requireAuth, async (req, res) => {
@@ -75,6 +91,16 @@ app.delete('/api/projects/:id', requireAuth, async (req, res) => {
 app.get('/api/projects/:id/meta', requireAuth, async (req, res) => {
   try { res.json(await projects.getMeta(req.params.id)); }
   catch (e) { res.status(404).json({ error: e.message }); }
+});
+
+app.patch('/api/projects/:id/meta', requireAuth, async (req, res) => {
+  try { res.json(await projects.patchMeta(req.params.id, req.body || {})); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.get('/api/projects/:id/memory', requireAuth, async (req, res) => {
+  try { res.json(await readMemory(req.params.id)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/projects/:id/tree', requireAuth, async (req, res) => {
@@ -136,14 +162,13 @@ server.on('upgrade', (req, socket, head) => {
 wssAgent.on('connection', (ws, req) => {
   let busy = false;
   let unsub = null;
-  let currentProject = null;
 
   const send = (obj) => { if (ws.readyState === ws.OPEN) { try { ws.send(JSON.stringify(obj)); } catch {} } };
+  const broker = new ApprovalBroker(send);
 
   // Allow the client to subscribe to live FS changes for a project.
   function watch(projectId) {
     if (unsub) { unsub(); unsub = null; }
-    currentProject = projectId;
     if (projectId) unsub = subscribe(projectId, () => send({ type: 'fs_changed' }));
   }
 
@@ -153,14 +178,26 @@ wssAgent.on('connection', (ws, req) => {
 
     if (msg.type === 'watch') { watch(msg.projectId); return; }
 
+    // Approval responses must be processed even while a run is in flight.
+    if (msg.type === 'approval_response') {
+      broker.respond(msg.id, msg.decision);
+      return;
+    }
+
     if (msg.type === 'chat') {
       if (busy) { send({ type: 'error', text: 'A task is already running.' }); return; }
       const { projectId, message } = msg;
       if (!projectId || !message) { send({ type: 'error', text: 'projectId and message required' }); return; }
       busy = true;
-      send({ type: 'run_start' });
+
       try {
         const meta = await projects.getMeta(projectId);
+        const globals = settings.get();
+        const model = meta.model || globals.defaultModel;
+        const permissionMode = meta.permissionMode || globals.defaultPermissionMode || 'ask';
+
+        send({ type: 'run_start', model, permissionMode });
+
         const history = (await projects.readChat(projectId))
           .filter((m) => m.role === 'user' || m.role === 'assistant')
           .map((m) => ({ role: m.role, content: m.content }));
@@ -171,14 +208,20 @@ wssAgent.on('connection', (ws, req) => {
           send(ev);
         };
 
-        const finalText = await runAgent({ projectId, userMessage: message, history, meta, emit });
+        const finalText = await runAgent({
+          projectId, userMessage: message, history, meta,
+          emit, model, permissionMode, approvals: broker,
+        });
 
-        await projects.appendChat(
+        const chat = await projects.appendChat(
           projectId,
           { role: 'user', content: message, ts: Date.now() },
           { role: 'assistant', content: finalText, tools: toolLog, ts: Date.now() }
         );
         send({ type: 'run_end' });
+
+        // Fire-and-forget: fold older conversation into the rolling summary.
+        maybeCompact(projectId, model, chat).catch(() => {});
       } catch (e) {
         send({ type: 'error', text: e.message });
         send({ type: 'run_end' });
@@ -188,8 +231,8 @@ wssAgent.on('connection', (ws, req) => {
     }
   });
 
-  ws.on('close', () => { if (unsub) unsub(); });
-  ws.on('error', () => { if (unsub) unsub(); });
+  ws.on('close', () => { if (unsub) unsub(); broker.denyAll(); });
+  ws.on('error', () => { if (unsub) unsub(); broker.denyAll(); });
   send({ type: 'ready' });
 });
 
@@ -197,10 +240,10 @@ wssAgent.on('connection', (ws, req) => {
 wssPty.on('connection', (ws, req) => {
   let projectId = null;
   try { projectId = new URL(req.url, 'http://x').searchParams.get('project'); } catch {}
-  if (!projectId) { ws.send('\r\n[KimiStudio] No project specified.\r\n'); ws.close(); return; }
+  if (!projectId) { ws.send('\r\n[Forge] No project specified.\r\n'); ws.close(); return; }
   attachPty(ws, projectId);
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[KimiStudio] backend listening on http://0.0.0.0:${PORT}`);
+  console.log(`[Forge] backend listening on http://localhost:${PORT}`);
 });

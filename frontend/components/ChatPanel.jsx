@@ -2,8 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Send, FilePlus, FileSearch, Pencil, Terminal as TerminalIcon, FolderPlus,
-  Trash2, Search, Loader2, CheckCircle2, Sparkles, User,
+  Trash2, Search, Loader2, CheckCircle2, XCircle, Sparkles, User, Brain,
+  ShieldAlert, Cpu,
 } from 'lucide-react';
+import { shortModel, MODE_LABELS } from '@/lib/api';
 
 function toolMeta(name, args = {}) {
   switch (name) {
@@ -39,7 +41,11 @@ function ToolCard({ tool }) {
       <span className="text-accent">{m.icon}</span>
       <span className="text-gray-300 font-medium">{m.label}</span>
       {m.detail && <span className="text-gray-500 font-mono truncate flex-1">{String(m.detail).slice(0, 80)}</span>}
-      {tool.done ? <CheckCircle2 size={13} className="text-green-500/80" /> : <Loader2 size={13} className="text-gray-500 animate-spin" />}
+      {tool.denied
+        ? <XCircle size={13} className="text-red-400/90" />
+        : tool.done
+          ? <CheckCircle2 size={13} className="text-green-500/80" />
+          : <Loader2 size={13} className="text-gray-500 animate-spin" />}
     </div>
   );
 }
@@ -51,7 +57,7 @@ function Message({ m }) {
       <div className="flex items-center gap-2 mb-1.5">
         {isUser ? <User size={13} className="text-gray-500" /> : <Sparkles size={13} className="text-accent" />}
         <span className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">
-          {isUser ? 'You' : 'Kimi'}
+          {isUser ? 'You' : 'Forge'}
         </span>
       </div>
       {!isUser && m.tools && m.tools.length > 0 && (
@@ -66,14 +72,77 @@ function Message({ m }) {
   );
 }
 
-export default function ChatPanel({ messages, busy, status, onSend, projectSelected }) {
+function approvalDetail(a) {
+  if (!a) return { title: '', detail: '' };
+  const p = a.preview || {};
+  switch (a.name) {
+    case 'run_command':
+      return { title: 'Run command', detail: p.command || (a.args && a.args.command) || '' };
+    case 'write_file':
+      return {
+        title: (p.exists ? 'Overwrite file' : 'Create file'),
+        detail: (p.path || (a.args && a.args.path) || '') + (p.bytes ? `  (${p.bytes} bytes)` : ''),
+        snippet: p.snippet,
+      };
+    case 'delete_file':
+      return { title: 'Delete', detail: p.path || (a.args && a.args.path) || '' };
+    case 'create_folder':
+      return { title: 'Create folder', detail: p.path || (a.args && a.args.path) || '' };
+    default:
+      return { title: a.name, detail: JSON.stringify(a.args || {}).slice(0, 120) };
+  }
+}
+
+function ApprovalCard({ approval, onRespond }) {
+  const d = approvalDetail(approval);
+  return (
+    <div className="border-t border-amber-500/30 bg-amber-500/[0.06] px-3 py-2.5">
+      <div className="flex items-center gap-2 text-amber-300 text-xs font-semibold">
+        <ShieldAlert size={14} /> Permission required — {d.title}
+      </div>
+      <div className="font-mono text-[12px] mt-1 text-gray-300 break-all">{d.detail}</div>
+      {d.snippet && (
+        <pre className="mt-1.5 max-h-28 overflow-auto bg-ink-950 border border-ink-700 rounded p-2 text-[11px] text-gray-400">
+          {d.snippet}
+        </pre>
+      )}
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={() => onRespond('allow')}
+          className="px-3 py-1.5 text-xs font-medium bg-accent hover:bg-accent-hover text-white rounded-md"
+        >
+          Allow
+        </button>
+        <button
+          onClick={() => onRespond('allow_always')}
+          className="px-3 py-1.5 text-xs text-gray-300 bg-ink-800 hover:bg-ink-750 border border-ink-700 rounded-md"
+          title="Allow this tool without asking for the rest of this session"
+        >
+          Always allow
+        </button>
+        <button
+          onClick={() => onRespond('deny')}
+          className="px-3 py-1.5 text-xs text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-md"
+        >
+          Deny
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function ChatPanel({
+  messages, busy, status, onSend, projectSelected,
+  model, mode, onOpenModelPicker, onModeChange, onOpenMemory,
+  pendingApproval, onApproval,
+}) {
   const [input, setInput] = useState('');
   const scrollRef = useRef(null);
   const taRef = useRef(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, status]);
+  }, [messages, status, pendingApproval]);
 
   function submit() {
     const text = input.trim();
@@ -85,10 +154,35 @@ export default function ChatPanel({ messages, busy, status, onSend, projectSelec
 
   return (
     <div className="w-[380px] shrink-0 bg-ink-900 border-l border-ink-700 flex flex-col min-h-0">
-      <div className="px-3 py-2.5 border-b border-ink-700 flex items-center gap-2">
-        <Sparkles size={15} className="text-accent" />
-        <span className="text-sm font-semibold">AI Agent</span>
-        <span className="text-[11px] text-gray-500 ml-auto font-mono">kimi-k2.6</span>
+      <div className="px-3 py-2 border-b border-ink-700 flex items-center gap-2">
+        <Sparkles size={15} className="text-accent shrink-0" />
+        <span className="text-sm font-semibold shrink-0">Agent</span>
+        <button
+          onClick={onOpenModelPicker}
+          disabled={!projectSelected}
+          title={model || 'Choose model'}
+          className="flex items-center gap-1 min-w-0 ml-1 px-2 py-1 text-[11px] font-mono bg-ink-800 hover:bg-ink-750 border border-ink-700 rounded-md text-gray-300 disabled:opacity-40"
+        >
+          <Cpu size={11} className="text-accent shrink-0" />
+          <span className="truncate">{model ? shortModel(model) : '…'}</span>
+        </button>
+        <select
+          value={mode || 'ask'}
+          disabled={!projectSelected}
+          onChange={(e) => onModeChange(e.target.value)}
+          title="Permission mode"
+          className="text-[11px] bg-ink-800 border border-ink-700 rounded-md px-1.5 py-1 text-gray-300 outline-none disabled:opacity-40"
+        >
+          {Object.entries(MODE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <button
+          onClick={onOpenMemory}
+          disabled={!projectSelected}
+          title="Project memory (AGENTS.md + session summary)"
+          className="text-gray-400 hover:text-accent disabled:opacity-40 shrink-0"
+        >
+          <Brain size={15} />
+        </button>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
@@ -113,6 +207,8 @@ export default function ChatPanel({ messages, busy, status, onSend, projectSelec
         )}
       </div>
 
+      {pendingApproval && <ApprovalCard approval={pendingApproval} onRespond={onApproval} />}
+
       <div className="border-t border-ink-700 p-2.5">
         <div className="flex items-end gap-2 bg-ink-800 border border-ink-700 rounded-xl px-3 py-2 focus-within:border-accent transition">
           <textarea
@@ -128,7 +224,7 @@ export default function ChatPanel({ messages, busy, status, onSend, projectSelec
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
             }}
-            placeholder={projectSelected ? 'Ask Kimi to build something…  (Enter to send)' : 'Select a project first'}
+            placeholder={projectSelected ? 'Ask Forge to build something…  (Enter to send)' : 'Select a project first'}
             className="flex-1 bg-transparent text-sm outline-none resize-none max-h-40 disabled:opacity-50"
           />
           <button

@@ -7,7 +7,9 @@ import EditorPane from '@/components/EditorPane';
 import ChatPanel from '@/components/ChatPanel';
 import TerminalPane from '@/components/TerminalPane';
 import PreviewPane from '@/components/PreviewPane';
-import { Terminal as TerminalIcon, Eye, Code2, LogOut, Loader2, Sparkles } from 'lucide-react';
+import ModelPicker from '@/components/ModelPicker';
+import MemoryModal from '@/components/MemoryModal';
+import { Terminal as TerminalIcon, Eye, Code2, LogOut, Loader2, Hammer } from 'lucide-react';
 
 export default function Home() {
   const [authed, setAuthed] = useState(null); // null = loading
@@ -15,6 +17,7 @@ export default function Home() {
   const [current, setCurrent] = useState(null);
   const [meta, setMeta] = useState(null);
   const [tree, setTree] = useState([]);
+  const [globalSettings, setGlobalSettings] = useState(null);
 
   const [tabs, setTabs] = useState([]); // {path, content, dirty}
   const [activePath, setActivePath] = useState(null);
@@ -22,9 +25,14 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+  const [pendingApproval, setPendingApproval] = useState(null);
 
   const [showTerminal, setShowTerminal] = useState(true);
   const [centerView, setCenterView] = useState('editor'); // 'editor' | 'preview'
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [modelsList, setModelsList] = useState(null);
+  const [modelsLoading, setModelsLoading] = useState(false);
 
   const wsRef = useRef(null);
   const currentRef = useRef(null);
@@ -32,13 +40,20 @@ export default function Home() {
   useEffect(() => { currentRef.current = current; }, [current]);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
+  // Effective per-project settings (project override → global default).
+  const effModel = (meta && meta.model) || (globalSettings && globalSettings.defaultModel) || '';
+  const effMode = (meta && meta.permissionMode) || (globalSettings && globalSettings.defaultPermissionMode) || 'ask';
+
   // ---------- auth ----------
   useEffect(() => {
     api.me().then((r) => setAuthed(!!r.authed)).catch(() => setAuthed(false));
   }, []);
 
   useEffect(() => {
-    if (authed) refreshProjects();
+    if (authed) {
+      refreshProjects();
+      api.settings().then(setGlobalSettings).catch(() => {});
+    }
   }, [authed]);
 
   // ---------- agent websocket ----------
@@ -81,7 +96,16 @@ export default function Home() {
         patchLast((a) => ({ ...a, tools: [...(a.tools || []), { id: m.id, name: m.name, args: m.args, done: false }] }));
         break;
       case 'tool_result':
-        patchLast((a) => ({ ...a, tools: (a.tools || []).map((t) => (t.id === m.id ? { ...t, done: true } : t)) }));
+        patchLast((a) => ({
+          ...a,
+          tools: (a.tools || []).map((t) => (t.id === m.id ? { ...t, done: true, denied: !!m.denied } : t)),
+        }));
+        break;
+      case 'approval_request':
+        setPendingApproval({ id: m.id, name: m.name, args: m.args, preview: m.preview });
+        break;
+      case 'approval_resolved':
+        setPendingApproval((p) => (p && p.id === m.id ? null : p));
         break;
       case 'fs_changed':
         refreshTree();
@@ -99,6 +123,7 @@ export default function Home() {
       case 'run_end':
         setBusy(false);
         setStatus('');
+        setPendingApproval(null);
         patchLast((a) => ({ ...a, streaming: false }));
         refreshTree();
         break;
@@ -134,6 +159,7 @@ export default function Home() {
     setCurrent(id);
     currentRef.current = id;
     setTabs([]); setActivePath(null); setTree([]); setMeta(null); setMessages([]);
+    setPendingApproval(null);
     setCenterView('editor');
     try { setMeta(await api.meta(id)); } catch {}
     try { setTree(await api.tree(id)); } catch {}
@@ -158,6 +184,37 @@ export default function Home() {
       if (id === current) { setCurrent(null); currentRef.current = null; setTabs([]); setTree([]); setMessages([]); setMeta(null); }
       await refreshProjects();
     } catch (e) { alert('Delete failed: ' + e.message); }
+  }
+
+  // ---------- model + mode ----------
+  async function openModelPicker() {
+    setShowModelPicker(true);
+    if (!modelsList && !modelsLoading) {
+      setModelsLoading(true);
+      try { setModelsList(await api.models()); } catch { setModelsList([]); }
+      setModelsLoading(false);
+    }
+  }
+  async function chooseModel(id) {
+    setShowModelPicker(false);
+    if (!current) return;
+    setMeta((m) => ({ ...(m || {}), model: id }));
+    try { await api.patchMeta(current, { model: id }); } catch (e) { alert('Could not save model: ' + e.message); }
+  }
+  async function changeMode(mode) {
+    if (!current) return;
+    setMeta((m) => ({ ...(m || {}), permissionMode: mode }));
+    try { await api.patchMeta(current, { permissionMode: mode }); } catch {}
+  }
+
+  // ---------- approvals ----------
+  function respondApproval(decision) {
+    if (!pendingApproval) return;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'approval_response', id: pendingApproval.id, decision }));
+    }
+    setPendingApproval(null);
   }
 
   // ---------- files ----------
@@ -231,9 +288,9 @@ export default function Home() {
       <div className="h-11 shrink-0 bg-ink-900 border-b border-ink-700 flex items-center px-3 gap-3">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded bg-accent/20 border border-accent/40 flex items-center justify-center">
-            <Sparkles size={13} className="text-accent" />
+            <Hammer size={13} className="text-accent" />
           </div>
-          <span className="font-semibold text-sm">KimiStudio</span>
+          <span className="font-semibold text-sm">Forge</span>
         </div>
         <div className="text-gray-600">/</div>
         <div className="text-sm text-gray-300 truncate">
@@ -308,7 +365,7 @@ export default function Home() {
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-600">
               <div className="text-center">
-                <Sparkles size={26} className="mx-auto mb-3 text-accent/50" />
+                <Hammer size={26} className="mx-auto mb-3 text-accent/50" />
                 <div className="text-sm">Create or select a project to start building.</div>
               </div>
             </div>
@@ -321,8 +378,28 @@ export default function Home() {
           status={status}
           onSend={sendMessage}
           projectSelected={!!current}
+          model={effModel}
+          mode={effMode}
+          onOpenModelPicker={openModelPicker}
+          onModeChange={changeMode}
+          onOpenMemory={() => setShowMemory(true)}
+          pendingApproval={pendingApproval}
+          onApproval={respondApproval}
         />
       </div>
+
+      {showModelPicker && (
+        <ModelPicker
+          models={modelsList}
+          loading={modelsLoading}
+          current={effModel}
+          onSelect={chooseModel}
+          onClose={() => setShowModelPicker(false)}
+        />
+      )}
+      {showMemory && current && (
+        <MemoryModal projectId={current} onClose={() => setShowMemory(false)} />
+      )}
     </div>
   );
 }
